@@ -9,6 +9,10 @@
   Track your collection, inspect pet attributes, genus types, bonuses, and stats with instantaneous search and filtering.
 </p>
 
+<p align="center">
+  <a href="https://vw5tywrl.github.io/aion2-pet-tracker/"><b>🌐 Live Demo on GitHub Pages</b></a>
+</p>
+
 ---
 
 ## Features
