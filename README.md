@@ -21,34 +21,31 @@
 - **Fast Search & Filtering**: Real-time filtering by name, genus, tier, and combat stats.
 - **Collection Tracking**: Track which pets you have collected with persistent local state.
 - **Modern Dark UI**: Clean, sleek aesthetic built with modern CSS and backdrop blurs.
-- **Zero Build Step**: Pure HTML/CSS/JavaScript. Fast to load and easy to deploy anywhere.
-- **Cloudflare Ready**: Pre-configured for Cloudflare Workers / Pages via `wrangler.jsonc`.
+- **Zero Build Step**: Pure HTML/CSS/JavaScript. Fast to load, no bundling or complex toolchains required.
+- **Hosted on GitHub Pages**: Automated, zero-maintenance global static hosting.
 
 ---
 
-## Live Preview & Deployment
+## Live Preview & Running Locally
+
+### Live Site
+
+Access the live tracker directly: **[https://vw5tywrl.github.io/aion2-pet-tracker/](https://vw5tywrl.github.io/aion2-pet-tracker/)**
 
 ### Running Locally
 
-You can serve the project using any local HTTP server:
+You can serve the project using Python's built-in HTTP server or any static file server:
 
 ```bash
-# Using Python 3
+# Clone the repository
+git clone https://github.com/vw5tywrl/aion2-pet-tracker.git
+cd aion2-pet-tracker
+
+# Start a local server
 python -m http.server 8080
-
-# Or using Cloudflare Wrangler
-npx wrangler dev
 ```
 
-Then open `http://localhost:8080` in your browser.
-
-### Deploying to Cloudflare Pages
-
-```bash
-npx wrangler pages deploy .
-```
-
-Or connect this repository directly to **GitHub Pages** or **Cloudflare Pages** for automated continuous deployment.
+Then open `http://localhost:8080` in your web browser.
 
 ---
 
