@@ -1341,6 +1341,109 @@ function togglePet(id, ev) {
   }
 }
 
+// ==========================================
+// BROWSER SESSION & NAVIGATION HISTORY ENGINE
+// ==========================================
+let searchDebounceTimer = null;
+let lastPushedSearchQuery = '';
+
+function getCurrentState() {
+  return {
+    cat: currentCat,
+    q: searchQuery,
+    genus: currentGenus,
+    hideOwned: !!hideOwned,
+    excl: !!onlyNonVerteron,
+    zone: selectedZoneId || null,
+    zworld: zWorldId || '1010',
+    zmob: selectedZoneMobKey || null,
+    pet: activeModalPet ? activeModalPet.id : null
+  };
+}
+
+function stateToUrl(state) {
+  const params = new URLSearchParams();
+  if (state.cat && state.cat !== 'no_spawn') params.set('cat', state.cat);
+  if (state.q) params.set('q', state.q);
+  if (state.genus && state.genus !== 'ALL') params.set('genus', state.genus);
+  if (state.hideOwned) params.set('hideOwned', '1');
+  if (state.excl) params.set('excl', '1');
+  if (state.cat === 'zone_search') {
+    if (state.zworld && state.zworld !== '1010') params.set('zworld', state.zworld);
+    if (state.zone) params.set('zone', state.zone);
+    if (state.zmob) params.set('zmob', state.zmob);
+  }
+  if (state.pet) params.set('pet', state.pet);
+  const qStr = params.toString();
+  return window.location.pathname + (qStr ? ('?' + qStr) : '');
+}
+
+function saveHistoryState(push = false) {
+  const st = getCurrentState();
+  const url = stateToUrl(st);
+  if (push) {
+    history.pushState(st, '', url);
+    lastPushedSearchQuery = st.q;
+  } else {
+    history.replaceState(st, '', url);
+  }
+}
+
+function applyHistoryState(state) {
+  const params = new URLSearchParams(window.location.search);
+  const cat = state?.cat || params.get('cat') || 'no_spawn';
+  const q = (state?.q !== undefined) ? state.q : (params.get('q') || '');
+  const genus = state?.genus || params.get('genus') || 'ALL';
+  const hide = (state?.hideOwned !== undefined) ? state.hideOwned : (params.get('hideOwned') === '1');
+  const excl = (state?.excl !== undefined) ? state.excl : (params.get('excl') === '1');
+  const petId = state?.pet || params.get('pet') || null;
+  const zoneId = state?.zone || params.get('zone') || null;
+  const worldId = state?.zworld || params.get('zworld') || '1010';
+  const mobKey = state?.zmob || params.get('zmob') || null;
+
+  currentCat = cat;
+  searchQuery = q;
+  currentGenus = genus;
+  hideOwned = hide;
+  onlyNonVerteron = excl;
+  zWorldId = worldId;
+  selectedZoneId = zoneId;
+  selectedZoneMobKey = mobKey;
+
+  // Sync Tab Buttons
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-cat') === currentCat);
+  });
+  // Sync Genus Buttons
+  document.querySelectorAll('.genus-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-genus') === currentGenus);
+  });
+  // Sync Zone Explorer World Buttons
+  document.querySelectorAll('.zworld-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-zworld') === zWorldId);
+  });
+
+  const searchEl = document.getElementById('searchInput');
+  if (searchEl) searchEl.value = searchQuery;
+
+  const hideEl = document.getElementById('hideOwnedToggle');
+  if (hideEl) hideEl.checked = hideOwned;
+
+  const exclEl = document.getElementById('onlyExclToggle');
+  if (exclEl) exclEl.checked = onlyNonVerteron;
+
+  // Sync Pet Modal
+  if (petId) {
+    const p = PETS.find(pet => pet.id === petId);
+    if (p) openPetModal(p, true);
+    else closeModal(true);
+  } else {
+    closeModal(true);
+  }
+
+  render();
+}
+
 function getZoneMobsForTab(p, cat) {
   if (cat === 'verteron') return p.verteron.map(m => ({ ...m, worldId: '1010', zone: 'Verteron' }));
   if (cat === 'altgard') return p.altgard.map(m => ({ ...m, worldId: '1110', zone: 'Altgard' }));
@@ -1402,7 +1505,7 @@ function updateModalCollectBtn() {
   btn.onclick = () => togglePet(activeModalPet.id);
 }
 
-function openPetModal(p) {
+function openPetModal(p, fromHistory = false) {
   activeModalPet = p;
   document.getElementById('modalPetImg').src = p.img;
   document.getElementById('modalPetName').textContent = p.name;
@@ -1425,12 +1528,32 @@ function openPetModal(p) {
   document.getElementById('petModal').classList.add('open');
   syncWorldButtons();
   rebuildMobChipsAndPins(true);
+
+  if (!fromHistory) {
+    saveHistoryState(true);
+  }
 }
 
-function closeModal() {
-  document.getElementById('petModal').classList.remove('open');
+function closeModal(fromHistory = false) {
+  const modal = document.getElementById('petModal');
+  const wasOpen = modal.classList.contains('open');
+  modal.classList.remove('open');
   activeModalPet = null;
+
+  if (!fromHistory && wasOpen) {
+    if (history.state && history.state.pet) {
+      history.back();
+    } else {
+      saveHistoryState(false);
+    }
+  }
 }
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && activeModalPet) {
+    closeModal();
+  }
+});
 
 document.getElementById('petModal').addEventListener('click', e => {
   if (e.target.id === 'petModal') closeModal();
@@ -1898,7 +2021,8 @@ document.querySelectorAll('.zworld-btn').forEach(btn => {
     document.querySelectorAll('.zworld-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-zworld') === zWorldId));
     selectedZoneId = null;
     selectedZoneMobKey = null;
-    resetZoneExplorerView();
+    saveHistoryState(true);
+    resetZoneExplorerView(false);
   });
 });
 
@@ -1907,25 +2031,29 @@ document.getElementById('zoneShowAllMapSpawns').addEventListener('change', e => 
   rebuildZoneActivePins(true);
 });
 
-function resetZoneExplorerView() {
+function resetZoneExplorerView(pushHistory = true) {
   selectedZoneId = null;
   selectedZoneMobKey = null;
   zCamU = 0.5;
   zCamV = 0.5;
   zCamZoom = 1.12;
+  if (pushHistory) saveHistoryState(true);
   renderZoneExplorerUI(false);
+  drawZoneMap();
 }
 
-function clearSelectedZone() {
+function clearSelectedZone(pushHistory = true) {
   selectedZoneId = null;
   selectedZoneMobKey = null;
   zCamU = 0.5;
   zCamV = 0.5;
   zCamZoom = 1.12;
+  if (pushHistory) saveHistoryState(true);
   renderZoneExplorerUI(false);
+  drawZoneMap();
 }
 
-function selectZoneOnExplorer(zoneId, autoZoom) {
+function selectZoneOnExplorer(zoneId, autoZoom, pushHistory = true) {
   const z = ZONES_BY_ID[zoneId];
   if (!z) return;
   selectedZoneId = zoneId;
@@ -1937,11 +2065,13 @@ function selectZoneOnExplorer(zoneId, autoZoom) {
     const spanV = Math.max(0.08, (z.bounds.maxV - z.bounds.minV) * 1.45);
     zCamZoom = Math.min(4.2, Math.max(1.35, 0.88 / Math.max(spanU, spanV)));
   }
+  if (pushHistory) saveHistoryState(true);
   renderZoneExplorerUI(false);
 }
 
-function selectMobInZone(mobKey) {
+function selectMobInZone(mobKey, pushHistory = true) {
   selectedZoneMobKey = (selectedZoneMobKey === mobKey) ? null : mobKey;
+  if (pushHistory) saveHistoryState(true);
   renderZoneExplorerUI(true);
 }
 
@@ -2203,12 +2333,14 @@ function drawZoneMap() {
     zCtx.stroke();
   });
 
-  // 3. Draw Zone Names & Mob Count Badges
+  // 3. Draw Zone Names & Mob Count Badges (Only shown on hover or when selected/tapped)
   zCtx.textAlign = 'center';
   zCtx.textBaseline = 'middle';
   wZones.forEach(z => {
     const isSel = (z.id === selectedZoneId);
     const isHov = (z.id === hoveredZoneId);
+    if (!isSel && !isHov) return; // Hidden by default, reveals only when hovered or selected
+
     const mobsCount = getFilteredMobsForZone(z).length;
     const ru = 0.5 + (z.x / span);
     const rv = 0.5 - (z.y / span);
@@ -2216,20 +2348,20 @@ function drawZoneMap() {
     const sy = imgTop  + rv * baseSize;
     if (sx < -100 || sx > w + 100 || sy < -40 || sy > h + 40) return;
 
-    zCtx.font = (isSel || isHov) ? '800 12px "Segoe UI", sans-serif' : '700 10.5px "Segoe UI", sans-serif';
-    zCtx.lineWidth = 3.2;
-    zCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+    zCtx.font = '800 12.5px "Segoe UI", sans-serif';
+    zCtx.lineWidth = 3.5;
+    zCtx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
     const titleTxt = z.n.toUpperCase();
     zCtx.strokeText(titleTxt, sx, sy - 6);
-    zCtx.fillStyle = isSel ? '#38bdf8' : (isHov ? '#fbbf24' : (mobsCount > 0 ? '#f8fafc' : '#64748b'));
+    zCtx.fillStyle = isSel ? '#38bdf8' : '#fbbf24';
     zCtx.fillText(titleTxt, sx, sy - 6);
 
     if (mobsCount > 0) {
       const subTxt = '(' + mobsCount + (mobsCount === 1 ? ' Mob)' : ' Mobs)');
-      zCtx.font = '700 9.5px "Segoe UI", sans-serif';
-      zCtx.strokeText(subTxt, sx, sy + 7);
+      zCtx.font = '700 10px "Segoe UI", sans-serif';
+      zCtx.strokeText(subTxt, sx, sy + 8);
       zCtx.fillStyle = isSel ? '#bae6fd' : '#fde68a';
-      zCtx.fillText(subTxt, sx, sy + 7);
+      zCtx.fillText(subTxt, sx, sy + 8);
     }
   });
 
@@ -2506,46 +2638,66 @@ function render() {
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    const newCat = btn.getAttribute('data-cat');
+    if (newCat === currentCat) return;
+
+    clearTimeout(searchDebounceTimer);
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentCat = btn.getAttribute('data-cat');
+    currentCat = newCat;
     onlyNonVerteron = false;
     document.getElementById('onlyExclToggle').checked = false;
+
+    saveHistoryState(true);
     render();
   });
 });
 
 document.querySelectorAll('.genus-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    const newG = btn.getAttribute('data-genus');
+    if (newG === currentGenus) return;
     document.querySelectorAll('.genus-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentGenus = btn.getAttribute('data-genus');
+    currentGenus = newG;
+
+    saveHistoryState(true);
     render();
   });
 });
 
 document.getElementById('searchInput').addEventListener('input', e => {
   searchQuery = e.target.value.trim();
+  saveHistoryState(false);
   render();
+
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    if (searchQuery !== lastPushedSearchQuery) {
+      saveHistoryState(true);
+    }
+  }, 750);
 });
 
 document.getElementById('hideOwnedToggle').addEventListener('change', e => {
   hideOwned = e.target.checked;
+  saveHistoryState(true);
   render();
 });
 
 document.getElementById('onlyExclToggle').addEventListener('change', e => {
   onlyNonVerteron = e.target.checked;
+  saveHistoryState(true);
   render();
 });
 
-// Explicitly reset form controls on load so browser form caching never pre-enables toggles
-document.getElementById('onlyExclToggle').checked = false;
-document.getElementById('hideOwnedToggle').checked = false;
-document.getElementById('zoneShowAllMapSpawns').checked = false;
-document.getElementById('searchInput').value = '';
+window.addEventListener('popstate', e => {
+  applyHistoryState(e.state);
+});
 
-render();
+// Initialize state from URL search params / history state
+applyHistoryState(history.state);
+saveHistoryState(false);
 </script>
 </body>
 </html>
