@@ -214,42 +214,45 @@
     background: #ffffff;
   }
 
-  /* Segmented Category Tabs - Grid Layout */
+  /* Segmented Category Tabs - Centered Pill Layout */
   .tabs {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
     gap: 6px;
     background: #0b0b0e;
     padding: 6px;
     border-radius: 12px;
     border: 1px solid var(--border);
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto;
   }
-  @media (max-width: 1100px) {
+  @media (max-width: 800px) {
     .tabs {
-      grid-template-columns: repeat(3, 1fr);
+      width: 100%;
     }
-  }
-  @media (max-width: 680px) {
-    .tabs {
-      grid-template-columns: repeat(2, 1fr);
+    .tab-btn {
+      flex: 1 1 calc(50% - 6px);
     }
   }
   .tab-btn {
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid transparent;
-    padding: 10px 12px;
+    padding: 9px 16px;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
     font-size: 0.83rem;
     letter-spacing: -0.01em;
     transition: all 0.15s ease;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     gap: 8px;
-    text-align: left;
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
   }
