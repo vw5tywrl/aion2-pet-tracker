@@ -187,6 +187,81 @@
     pointer-events: none;
   }
 
+  /* Spacetime Rift Countdown Pill */
+  .rift-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #0c0c0f;
+    border: 1px solid var(--border);
+    padding: 7px 12px;
+    border-radius: 9px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    user-select: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .rift-timer:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .rift-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--cogni);
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.65);
+    flex-shrink: 0;
+  }
+  .rift-timer.soon {
+    border-color: rgba(251, 191, 36, 0.38);
+    background: rgba(251, 191, 36, 0.06);
+  }
+  .rift-timer.soon .rift-dot {
+    background: var(--varian);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+    animation: riftPulse 1.2s infinite ease-in-out;
+  }
+  .rift-timer.active {
+    border-color: rgba(16, 185, 129, 0.48);
+    background: rgba(16, 185, 129, 0.09);
+    color: var(--text);
+  }
+  .rift-timer.active .rift-dot {
+    background: var(--green-bright);
+    box-shadow: 0 0 9px rgba(52, 211, 153, 0.9);
+    animation: riftPulse 1s infinite ease-in-out;
+  }
+  .rift-label {
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
+  }
+  .rift-timer.active .rift-label {
+    color: var(--green-bright);
+    font-weight: 600;
+  }
+  .rift-countdown {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+  .rift-region-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+  }
+  @keyframes riftPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.55; }
+  }
+
   /* Sleek Sliding Pill Switches */
   .toggle-owned {
     display: inline-flex;
@@ -1195,6 +1270,12 @@
           </svg>
         </button>
       </div>
+      <div class="rift-timer" id="riftTimerPill" title="Spacetime Rift Schedule (02:00, 05:00, 08:00, 11:00, 14:00, 17:00, 20:00, 23:00 Server Time) — Click to switch Server Region">
+        <span class="rift-dot"></span>
+        <span class="rift-label" id="riftTimerLabel">Next Rift</span>
+        <span class="rift-countdown" id="riftTimerClock">--:--:--</span>
+        <span class="rift-region-tag" id="riftRegionTag">KR</span>
+      </div>
       <label class="toggle-owned" id="onlyExclWrap" style="display:none;">
         <input type="checkbox" id="onlyExclToggle" autocomplete="off">
         <span id="onlyExclLabel">Only Exclusives</span>
@@ -1219,11 +1300,11 @@
     <button class="tab-btn" data-cat="abyss">
       <span class="tab-label">Abyss (Reshanta)</span> <span class="badge-count" id="count-abyss">25</span>
     </button>
-    <button class="tab-btn" data-cat="all">
-      <span class="tab-label">All Regular Pets</span> <span class="badge-count" id="count-all">200</span>
-    </button>
     <button class="tab-btn" data-cat="zone_search">
       <span class="tab-label">Search by Zone</span> <span class="badge-count" id="count-zone_search">68 Zones</span>
+    </button>
+    <button class="tab-btn" data-cat="all">
+      <span class="tab-label">All Regular Pets</span> <span class="badge-count" id="count-all">200</span>
     </button>
   </div>
 
@@ -2782,6 +2863,95 @@ window.addEventListener('popstate', e => {
 // Initialize state from URL search params / history state
 applyHistoryState(history.state);
 saveHistoryState(false);
+
+// ==========================================
+// SPACETIME RIFT LIVE COUNTDOWN (Every 3h: 02, 05, 08, 11, 14, 17, 20, 23 ST)
+// ==========================================
+const RIFT_REGIONS = [
+  { id: 'KR',    label: 'KR',    utcOffsetHours: 9,    name: 'Korea (UTC+9)' },
+  { id: 'TW',    label: 'TW',    utcOffsetHours: 8,    name: 'Taiwan (UTC+8)' },
+  { id: 'LOCAL', label: 'LOCAL', utcOffsetHours: null, name: 'Local Time' }
+];
+let riftRegionIdx = 0;
+try {
+  const savedReg = localStorage.getItem('aion2_rift_region');
+  const foundIdx = RIFT_REGIONS.findIndex(r => r.id === savedReg);
+  if (foundIdx !== -1) riftRegionIdx = foundIdx;
+} catch (e) {}
+
+function formatRiftHMS(totalSec) {
+  const s = Math.max(0, Math.floor(totalSec));
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  if (hrs > 0) {
+    return String(hrs).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+  }
+  return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+}
+
+function updateRiftTimer() {
+  const pill = document.getElementById('riftTimerPill');
+  const lbl = document.getElementById('riftTimerLabel');
+  const clk = document.getElementById('riftTimerClock');
+  const tag = document.getElementById('riftRegionTag');
+  if (!pill || !lbl || !clk || !tag) return;
+
+  const reg = RIFT_REGIONS[riftRegionIdx];
+  tag.textContent = reg.label;
+
+  const now = new Date();
+  let stHours, stMins, stSecs;
+  if (reg.utcOffsetHours === null) {
+    stHours = now.getHours();
+    stMins  = now.getMinutes();
+    stSecs  = now.getSeconds();
+  } else {
+    const stMs = now.getTime() + (reg.utcOffsetHours * 3600 * 1000);
+    const stDate = new Date(stMs);
+    stHours = stDate.getUTCHours();
+    stMins  = stDate.getUTCMinutes();
+    stSecs  = stDate.getUTCSeconds();
+  }
+
+  // Rifts spawn every 3 hours at 02:00, 05:00, 08:00, 11:00, 14:00, 17:00, 20:00, 23:00 ST
+  // That means (stHours - 2 + 24) % 3 === 0 at minute 00:00
+  const cycleHours = (stHours - 2 + 24) % 3;
+  const elapsedInCycleSec = (cycleHours * 3600) + (stMins * 60) + stSecs;
+  const cycleLengthSec = 3 * 3600; // 10800s (3 hours)
+  const portalOpenSec = 10 * 60;   // First 10 minutes (600s) portals are open to enter
+
+  if (elapsedInCycleSec < portalOpenSec) {
+    // RIFT IS OPEN RIGHT NOW (first 10 minutes)
+    const remainOpen = portalOpenSec - elapsedInCycleSec;
+    pill.classList.add('active');
+    pill.classList.remove('soon');
+    lbl.textContent = 'Rift Open';
+    clk.textContent = formatRiftHMS(remainOpen);
+    pill.title = 'Spacetime Rift portals are OPEN NOW! (' + formatRiftHMS(remainOpen) + ' left to enter) • Server: ' + reg.name + ' (Click to switch)';
+  } else {
+    const remainToNext = cycleLengthSec - elapsedInCycleSec;
+    pill.classList.remove('active');
+    pill.classList.toggle('soon', remainToNext <= 600); // Pulse amber in final 10 mins before spawn
+    lbl.textContent = 'Next Rift';
+    clk.textContent = formatRiftHMS(remainToNext);
+
+    const nextSpawnLocal = new Date(now.getTime() + remainToNext * 1000);
+    const nextLocalStr = nextSpawnLocal.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    pill.title = 'Next Spacetime Rift at ' + nextLocalStr + ' your time • Server: ' + reg.name + ' (Click to switch KR / TW / LOCAL)';
+  }
+}
+
+document.getElementById('riftTimerPill').addEventListener('click', () => {
+  riftRegionIdx = (riftRegionIdx + 1) % RIFT_REGIONS.length;
+  try {
+    localStorage.setItem('aion2_rift_region', RIFT_REGIONS[riftRegionIdx].id);
+  } catch (e) {}
+  updateRiftTimer();
+});
+
+updateRiftTimer();
+setInterval(updateRiftTimer, 1000);
 </script>
 </body>
 </html>
